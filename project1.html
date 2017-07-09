@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>three.js webgl - buffergeometry - lines drawcalls</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            color: #cccccc;
+            font-family: Monospace;
+            font-size: 13px;
+            text-align: center;
+            background-color: #000000;
+            margin: 0px;
+            overflow: hidden;
+        }
+        
+        #info {
+            position: absolute;
+            top: 0px;
+            width: 100%;
+            padding: 5px;
+        }
+        
+        a {
+            color: #0080ff;
+        }
+        
+        #message {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            padding: 5px;
+        }
+        
+        input {
+            top: 0px;
+            font-size: 35px;
+            background-color: transparent;
+            border: none;
+            border-bottom: 2px solid #FFB4A2;
+            text-align: center;
+            color: #ffffff;
+            font-family: 'Quicksand', sans-serif;
+            width: auto;
+        }
+        
+        input:focus {
+            outline: none;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="container">
+
+    </div>
+
+    <div id="message">
+        <input type="text" name="message" placeholder="saysomething"></input>
+    </div>
+    <script src="js/libs/dat.gui.min.js">
+    </script>
+    <script src="../build/three.js"></script>
+    <script src="js/renderers/Projector.js"></script>
+
+    <script src="js/libs/tween.min.js"></script>
+    <script src="js/libs/stats.min.js"></script>
+
+
+    <script>
+        var renderer, container, scene, camera, controls;
+        var stars, starPositions;
+        var starData = [];
+        var maxStarNumber = 800;
+        var r = 2000;
+        var mouse, raycaster;
+        var isPlay = true;
+
+
+
+
+
+        init();
+        animate();
+
+        function init() {
+            container = document.getElementById("container");
+
+            //Create a WebGLRenderer and turn on shadows in the renderer
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
+            camera.position.z = 1000;
+
+            scene.add(new THREE.AmbientLight(0x555555));
+            scene.fog = new THREE.FogExp2(0x000000, 0.001);
+
+            sprite = new THREE.TextureLoader().load("textures/sprites/disc.png");
+
+
+
+
+
+
+            //Create a SpotLight and turn on shadows for the light
+            var light = new THREE.SpotLight(0x555555);
+            light.castShadow = false; // default false
+            scene.add(light);
+            //Set up shadow properties for the light
+            light.shadow.mapSize.width = 512; // default
+            light.shadow.mapSize.height = 512; // default
+            light.shadow.camera.near = 0.5; // default
+            light.shadow.camera.far = 500 // default
+
+
+            //Create stars
+            var pMaterial = new THREE.PointsMaterial({
+                color: 0xFFFFFF,
+                size: 50,
+                map: sprite,
+                blending: THREE.AdditiveBlending,
+                alphaTest: 0.8,
+                transparent: true,
+                sizeAttenuation: false //far points smaller
+            });
+            pMaterial.color.setHSL(1.0, 0.3, 0.7);
+
+
+            stars = new THREE.BufferGeometry();
+            starPositions = new Float32Array(maxStarNumber * 3);
+
+            for (var i = 0; i < maxStarNumber; i++) {
+                var x = Math.random() * r - r / 2;
+                var y = Math.random() * r - r / 2;
+                var z = Math.random() * r - r / 2
+
+                starPositions[i * 3] = x;
+                starPositions[i * 3 + 1] = y;
+                starPositions[i * 3 + 2] = z;
+
+                // add more info to the particles
+                starData.push({
+                    velocity: new THREE.Vector3(-1 + Math.random() * 2, -1 + Math.random() * 2, -1 + Math.random() * 2),
+                    numConnections: 0,
+                    textString: 'I love the world'
+                });
+            }
+
+            stars.setDrawRange(0, maxStarNumber);
+            stars.addAttribute('position', new THREE.BufferAttribute(starPositions, 3).setDynamic(true)); //remind GPU this value will be used often
+            stars.computeBoundingSphere();
+
+            // create the particle system
+            pointCloud = new THREE.Points(stars, pMaterial);
+            scene.add(pointCloud);
+
+
+
+            raycaster = new THREE.Raycaster();
+            mouse = new THREE.Vector2();
+
+            renderer = new THREE.WebGLRenderer({
+                antialias: false
+            });
+            renderer.setClearColor(0x000000);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.sortObjects = false;
+            renderer.gammaInput = true;
+            renderer.gammaOutput = true;
+            container.appendChild(renderer.domElement);
+
+            window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('mousedown', onDocumentMouseDown, false);
+            document.addEventListener('touchstart', onDocumentTouchStart, false);
+
+            document.addEventListener('mousemove', onDocumentMouseMove, false);
+        }
+
+        function onWindowResize() {
+
+            camera.aspect = window.innerWidth / window.innerHeight;
+
+            camera.updateProjectionMatrix();
+
+            renderer.setSize(window.innerWidth, window.innerHeight);
+
+        }
+
+        function onDocumentMouseMove(event) {
+            
+          
+             mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+        }
+        
+        
+        
+        function onDocumentTouchStart(event) {
+
+            event.preventDefault();
+
+            event.clientX = event.touches[0].clientX;
+            event.clientY = event.touches[0].clientY;
+            
+            
+            onDocumentMouseDown(event);
+
+        }
+
+
+        function onDocumentMouseDown(event) {
+            event.preventDefault();
+
+            mouse.x = (event.clientX / renderer.domElement.clientWidth) * 2 - 1;
+            mouse.y = -(event.clientY / renderer.domElement.clientHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            var intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+                isPlay = false;
+                console.log("fuck1");
+                
+                new TWEEN.Tween( intersects[ 0 ].object.position ).to( {
+						x: Math.random() * 800 - 400,
+						y: Math.random() * 800 - 400,
+						z: Math.random() * 800 - 400 }, 2000 )
+					.easing( TWEEN.Easing.Elastic.Out).start();
+            }
+
+
+        }
+
+        function animate() {
+
+            var vertexpos = 0;
+
+
+            for (var i = 0; i < maxStarNumber; i++) {
+
+                // get the particle
+                var sData = starData[i];
+
+//                starPositions[i * 3] += sData.velocity.x;
+//                starPositions[i * 3 + 1] += sData.velocity.y;
+//                starPositions[i * 3 + 2] += sData.velocity.z;
+
+                //hit the wall, then return
+                if (starPositions[i * 3 + 1] < -r || starPositions[i * 3 + 1] > r)
+                    sData.velocity.y = -sData.velocity.y;
+
+                if (starPositions[i * 3] < -r || starPositions[i * 3] > r)
+                    sData.velocity.x = -sData.velocity.x;
+
+                if (starPositions[i * 3 + 2] < -r || starPositions[i * 3 + 2] > r)
+                    sData.velocity.z = -sData.velocity.z;
+
+            }
+            pointCloud.geometry.attributes.position.needsUpdate = true;
+
+            requestAnimationFrame(animate);
+
+            render();
+
+        }
+
+        function render() {
+             
+            
+              raycaster.setFromCamera(mouse, camera);
+
+            var intersects = raycaster.intersectObjects(scene.children, true);
+
+            if (intersects.length > 0) {
+               console.log("fuck");
+            }
+//
+//            var time = Date.now() * 0.02;
+//            var theta = 0;
+//            theta += time;
+//            var radius = 600;
+//            camera.position.x = radius * Math.sin(THREE.Math.degToRad(theta));
+//            camera.position.y = radius * Math.sin(THREE.Math.degToRad(theta));
+//            camera.position.z = radius * Math.cos(THREE.Math.degToRad(theta));
+            camera.lookAt(scene.position);
+
+            renderer.render(scene, camera);
+
+        }
+    </script>
+</body>
+
+</html>
