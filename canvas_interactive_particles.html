@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>three.js canvas - interactive particles</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+    <style>
+        body {
+            color: #cccccc;
+            font-family: Monospace;
+            font-size: 13px;
+            text-align: center;
+            background-color: #000000;
+            margin: 0px;
+            overflow: hidden;
+        }
+        
+        #message {
+            position: absolute;
+            top: 50%;
+            width: 100%;
+            padding: 5px;
+        }
+        
+        input {
+            top: 0px;
+            font-size: 35px;
+            background-color: transparent;
+            border: none;
+            border-bottom: 2px solid #FFB4A2;
+            text-align: center;
+            color: #ffffff;
+            font-family: 'Quicksand', sans-serif;
+            width: auto;
+        }
+        
+        input:focus {
+            outline: none;
+        }
+        /* The Modal (background) */
+        
+        .modal {
+            position: absolute;
+            top: 0;
+            display: none;
+            /* Hidden by default */
+            position: fixed;
+            /* Stay in place */
+            z-index: 1;
+            /* Sit on top */
+            width: 100%;
+            /* Full width */
+            height: 100%;
+            /* Full height */
+            overflow: auto;
+            /* Enable scroll if needed */
+            background-color: rgb(0, 0, 0);
+            /* Fallback color */
+            background-color: rgba(0, 0, 0, 0.4);
+            /* Black w/ opacity */
+               padding-top: 20%;
+        }
+        /* Modal Content/Box */
+        
+        .modal-content {
+         
+            background-color: transparent;
+            width: auto;
+            color: aliceblue;
+            font-size: 50px;
+            text-align: center;
+            vertical-align: middle
+            
+            /* 15% from the top and centered */
+            /* Could be more or less, depending on screen size */
+        }
+        /* The Close Button */
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: black;
+            text-decoration: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="container">
+
+    </div>
+
+    <div id="message">
+        <input type="text" name="message" placeholder="saysomething"></input>
+    </div>
+
+    <!-- The Modal -->
+    <div id="myModal" class="modal">
+          <span class="close">&times;</span>
+        <!-- Modal content -->
+        <div class="modal-content">
+          
+            <p id="modalText">Some text in the Modal..</p>
+        </div>
+
+    </div>
+</body>
+
+<script src="../build/three.js"></script>
+
+<script src="js/renderers/Projector.js"></script>
+<script src="js/renderers/CanvasRenderer.js"></script>
+<script src="js/libs/tween.min.js"></script>
+
+<script src="js/libs/stats.min.js"></script>
+
+<script>
+    var container, stats;
+    var camera, scene, renderer;
+
+    var raycaster;
+    var mouse;
+    var r = 2000;
+    var particleNumber = 500;
+
+    var particleData = [];
+    var PI2 = Math.PI * 2;
+
+    var programFill = function(context) {
+
+        context.beginPath();
+        context.arc(0, 0, 0.5, 0, PI2, true);
+        context.fill();
+
+    };
+
+    var programStroke = function(context) {
+
+        context.lineWidth = 0.025;
+        context.beginPath();
+        context.arc(0, 0, 0.5, 0, PI2, true);
+        context.stroke();
+
+    };
+
+    var INTERSECTED;
+
+    init();
+    initforModal();
+    animate();
+
+    function initforModal() {
+        // Get the modal
+        var modal = document.getElementById('myModal');
+
+        // Get the <span> element that closes the modal
+        var span = document.getElementsByClassName("close")[0];
+
+        // When the user clicks on <span> (x), close the modal
+        span.onclick = function() {
+            modal.style.display = "none";
+        }
+
+        // When the user clicks anywhere outside of the modal, close it
+        window.onclick = function(event) {
+            if (event.target == modal) {
+                modal.style.display = "none";
+            }
+        }
+    }
+
+    function init() {
+        
+
+        container = document.getElementById('container');
+        
+
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 1, 10000);
+        camera.position.set(0, 300, 500);
+
+        scene = new THREE.Scene();
+         scene.add(new THREE.AmbientLight(0x555555));
+        scene.fog = new THREE.FogExp2(0x000000, 0.1);
+
+        sprite = new THREE.TextureLoader().load("textures/sprites/disc.png");
+
+
+        for (var i = 0; i < particleNumber; i++) {
+
+            var particle = new THREE.Sprite(new THREE.SpriteCanvasMaterial({
+                //                color: Math.random() * 0x808080 + 0x808080,
+                color: 0xFFB4A2,
+                blending: THREE.AdditiveBlending,
+                alphaTest: 0.8,
+                transparent: true,
+                program: programStroke,
+            }));
+            particle.position.x = Math.random() * r - r / 2;
+            particle.position.y = Math.random() * r - r / 2;
+            particle.position.z = Math.random() * r - r / 2;
+            particle.scale.x = particle.scale.y = Math.random() * 20 + 20;
+
+            particleData[particle.id] = {
+                textString: 'I love the world'
+            };
+            
+            scene.add(particle);
+
+        }
+
+        //
+
+        raycaster = new THREE.Raycaster();
+        mouse = new THREE.Vector2();
+
+        renderer = new THREE.CanvasRenderer();
+        renderer.setClearColor(0x000000);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+
+        stats = new Stats();
+        container.appendChild(stats.dom);
+
+//        document.addEventListener('mousemove', onDocumentMouseMove, false);
+        
+        document.addEventListener('mousedown', onDocumentMouseDwon, false);
+
+        //
+
+        container.addEventListener('resize', onWindowResize, false);
+
+    }
+
+    function onWindowResize() {
+
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+
+        renderer.setSize(window.innerWidth, window.innerHeight);
+
+    }
+
+    function onDocumentMouseDwon(event) {
+
+        event.preventDefault();
+
+        mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+        mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+        
+        
+          // find intersections
+
+        raycaster.setFromCamera(mouse, camera);
+
+        var intersects = raycaster.intersectObjects(scene.children);
+
+        if (intersects.length > 0 && intersects.length < 200) {
+ 
+            if (INTERSECTED != intersects[0].object) {
+                console.log('funcl');
+
+                if (INTERSECTED) INTERSECTED.material.program = programStroke;
+
+                INTERSECTED = intersects[0].object;
+                INTERSECTED.material.program = programFill;
+                
+                var modal = document.getElementById("myModal");
+                modal.style.display = "block";
+                
+                var modalText = document.getElementById("modalText");
+                
+            
+                var id = intersects[0].object.id;
+                modalText.innerHTML = particleData[id].textString; 
+
+                
+
+            }
+
+        } else {
+
+            if (INTERSECTED) INTERSECTED.material.program = programStroke;
+
+            INTERSECTED = null;
+
+        }
+
+    }
+    
+
+
+    //
+
+    function animate() {
+
+        requestAnimationFrame(animate);
+
+        render();
+        stats.update();
+
+    }
+
+    var radius = 600;
+    var theta = 0;
+
+    function render() {
+
+        // rotate camera
+
+        theta += 0.1;
+
+        camera.position.x = radius * Math.sin(THREE.Math.degToRad(theta));
+        camera.position.y = radius * Math.sin(THREE.Math.degToRad(theta));
+        camera.position.z = radius * Math.cos(THREE.Math.degToRad(theta));
+        camera.lookAt(scene.position);
+
+        camera.updateMatrixWorld();
+
+      
+
+        renderer.render(scene, camera);
+
+    }
+</script>
+
+</body>
+
+</html>
